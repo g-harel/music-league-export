@@ -1,0 +1,80 @@
+<html>
+<body>
+<script src="./data.js"></script>
+
+<script>
+
+const initKey = (o, k, v) => o[k] = o[k] === undefined ? v : o[k];
+const inc = (o, n, ...k) => {
+    for (let i = 0; i < k.length; i++) {
+        const last = i === k.length - 1;
+        if (last) {
+            initKey(o, k[i], 0);
+            o[k[i]] += n;
+        } else {
+            initKey(o, k[i], {});
+            o = o[k[i]];
+        }
+    }
+}
+
+const csv = (matrix) => matrix.map((row) => row.join(",")).join("\n");
+
+const votes = {};
+const countedVotes = {};
+const voteSources = {};
+const sharedVotes = {};
+for (const round of rounds) {
+    for (const result of round.results) {
+        let sum = 0;
+        for (const vote of result.votes) {
+            sum += vote.votes;
+
+            inc(voteSources, vote.votes, result.submitter, vote.voter);
+            for (const {voter} of result.votes) {
+                inc(sharedVotes, vote.votes, voter, vote.voter);
+                inc(sharedVotes, vote.votes, vote.voter, voter);
+            }
+        }
+
+        inc(votes, sum, result.submitter);
+        if (!result.dsq) inc(countedVotes, sum, result.submitter);
+    }
+}
+const players = Object.keys(votes).sort();
+
+const playerMatrix = (fn) => {
+    return [
+        [null, ...players],
+        ...players.map((p1) => [p1, ...players.map((p2) => fn(p1, p2) || 0)])
+    ];
+}
+
+
+console.log(
+    "Standings\n",
+    ",Total Votes,Counted Votes,Rounds Played\n",
+    csv(
+        players
+            .slice()
+            .sort((a, b) => votes[b] - votes[a])
+            .map((p) => [p, votes[p], countedVotes[p], sharedVotes[p][p] / 2 / 6])
+    ),
+    "\n\n",
+    "Vote Sources\n",
+    csv(playerMatrix((p1, p2) => voteSources[p1][p2])),
+    "\n\n",
+    "Votes For\n",
+    csv(playerMatrix((p1, p2) => (voteSources[p1][p2] || 0) + (voteSources[p2][p1] || 0))),
+    "\n\n",
+    "Reciprocity\n",
+    csv(playerMatrix((p1, p2) => (voteSources[p1][p2] || 0) - (voteSources[p2][p1] || 0))),
+    "\n\n",
+    "Shared Votes\n",
+    csv(playerMatrix((p1, p2) => sharedVotes[p1][p2])),
+);
+
+</script>
+
+</body>
+</html>
